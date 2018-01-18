@@ -1,0 +1,8 @@
+[package]
+name = "rfm95w"
+version = "0.1.0"
+authors = ["David Wood <devel@dtwood.uk>"]
+
+[dependencies]
+bitflags = "*"
+embedded-hal = "*"
