@@ -34,18 +34,16 @@ pub enum Frf {
 }
 
 /// MFRC522 driver
-pub struct Rfm95w<SPI, NSS> {
+pub struct Rfm95w<SPI> {
     spi: SPI,
-    nss: NSS,
 }
 
-impl<E, NSS, SPI> Rfm95w<SPI, NSS>
+impl<E, SPI> Rfm95w<SPI>
 where
     SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
-    NSS: OutputPin,
 {
-    pub fn new(spi: SPI, nss: NSS, freq: Frf, power: u8) -> Result<Self, E> {
-        let mut rfm95w = Self { spi: spi, nss: nss };
+    pub fn new(spi: SPI, freq: Frf, power: u8) -> Result<Self, E> {
+        let mut rfm95w = Self { spi };
 
         rfm95w.init_helper()?;
         rfm95w.setfreq(freq)?;
@@ -55,8 +53,6 @@ where
     }
 
     fn init_helper(&mut self) -> Result<(), E> {
-        // uint8_t RegOpMode, RegModemConfig1, RegModemConfig2;
-
         // Initialise SPI peripheral
         // self.spi.reset_high()
         // self.spi.disable_crc();
@@ -67,16 +63,6 @@ where
         //     spi::Crcl::Bit8, // DFF/CRC length
         //     spi::BitOrder::MsbFirst // MSB first
         // );
-
-        // Manual NSS handling:
-        // self.spi.enable_software_slave_management();
-        // self.spi.set_nss_high();
-        self.nss.set_high();
-
-        // self.spi.set_data_size(spi::DataSize::Bit8)
-        // self.spi.set_fifo_reception_threshold_8bit(); // 8-bit rx-length
-
-        // self.spi.enable()
 
         // Wait for chip to warm up
         delay_us(10_000);
@@ -110,45 +96,35 @@ where
 
     /// Write the byte of data to the address
     fn writereg(&mut self, register: Register, data: u8) -> Result<(), E> {
-        self.nss.set_low();
-
         let data = &[register as u8 | (1 << 7), data];
-
         self.spi.write(data)?;
-        self.nss.set_high();
 
         Ok(())
     }
 
     /// Read a byte of data from the address
     fn readreg(&mut self, register: Register) -> Result<u8, E> {
-        self.nss.set_low();
         let mut data = [register as u8 & !(1 << 7)];
         self.spi.transfer(&mut data)?;
-        self.nss.set_high();
 
         Ok(data[0])
     }
 
     /// Bulk write to a register from a buffer
     fn bulkwrite(&mut self, register: Register, data: &[u8]) -> Result<(), E> {
-        self.nss.set_low();
         self.spi.write(&[register as u8 | (1 << 7)])?;
         self.spi.write(data)?;
-        self.nss.set_high();
 
         Ok(())
     }
 
     /// Bulk read from a register to a buffer
     fn bulkread(&mut self, register: Register, data: &mut [u8]) -> Result<(), E> {
-        self.nss.set_low();
         data[0] = register as u8 & !(1 << 7);
         for byte in &mut data[1..] {
             *byte = 0;
         }
         self.spi.transfer(data)?;
-        self.nss.set_high();
 
         Ok(())
     }
